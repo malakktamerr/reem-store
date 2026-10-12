@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  nav {
+    position: sticky !important;
+    top: 0 !important;
+  }
+}
+
+@layer base {
+  html {
+    overflow-x: hidden;
+    height: 100%;
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    overflow-x: hidden;
+    height: 100%;
+    font-weight: 400;
+  }
+  
+  #root {
+    height: 100%;
+  }
+
+  /* Scroll margin for sections to account for sticky navbar */
+  section[id] {
+    scroll-margin-top: 150px;
+  }
+}
+

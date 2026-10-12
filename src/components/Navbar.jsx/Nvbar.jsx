@@ -1,0 +1,282 @@
+
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { FiSearch, FiUser, FiGlobe } from "react-icons/fi";
+import { useAuth } from "../../Context/AuthContext";
+import { useLanguage } from "../../Context/LanguageContext";
+import { useCategories } from "../../hooks/useCategories";
+import { getCategoryById, getProductById } from "../../api/categories";
+
+function Navbar({ activeCollection, onSelectCollection }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const { user, logout } = useAuth();
+  const { t, lang, toggleLang, isRTL } = useLanguage();
+  const { categories, loading } = useCategories();
+  const dropdownRef = useRef(null);
+  const langDropdownRef = useRef(null);
+  const searchRef = useRef(null);
+
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsUserDropdownOpen(false);
+      }
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target)) {
+        setIsLangDropdownOpen(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleUserClick = () => {
+    if (user && (user.name || user.email)) {
+      setIsUserDropdownOpen((prev) => !prev);
+    } else {
+      navigate("/login", { state: { backgroundLocation: location } });
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setIsUserDropdownOpen(false);
+  };
+
+  const handleNavClick = (categoryName) => {
+    onSelectCollection(categoryName.toLowerCase());
+    setIsMenuOpen(false);
+  };
+
+  const handleSearch = async () => {
+    if (searchQuery.trim() === '') return;
+    
+    try {
+      for (const category of categories) {
+        const response = await getCategoryById(category.id);
+        
+        if (response.data && response.data.success && response.data.data) {
+          const products = response.data.data.products || [];
+          
+          for (const product of products) {
+            const productResponse = await getProductById(product.id);
+            
+            if (productResponse.data && productResponse.data.success && productResponse.data.data) {
+              const productData = productResponse.data.data;
+              const variants = productData.variants || [];
+              
+              const foundVariant = variants.find(v => 
+                v.name.toLowerCase().includes(searchQuery.toLowerCase())
+              );
+              
+              if (foundVariant && foundVariant.google_photo_link) {
+                window.open(foundVariant.google_photo_link, '_blank');
+                setIsSearchOpen(false);
+                setSearchQuery('');
+                return;
+              }
+            }
+          }
+        }
+      }
+      
+      alert(`${t.navbar.noResults} "${searchQuery}"`);
+      setSearchQuery('');
+    } catch (error) {
+      console.error('Search error:', error);
+      alert('Search failed. Please try again.');
+    }
+  };
+
+  return (
+    <nav className="sticky top-0 w-full bg-white/95 backdrop-blur-sm shadow-sm z-50 pt-4">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative flex items-center justify-between py-4">
+          
+          {/* Hamburger Menu & Logo for desktop / Mobile positioning */}
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden text-gray-700 hover:text-gray-900 transition-colors z-10"
+              aria-label="Toggle menu"
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            {/* Logo: In center on mobile, normal on laptop (lg:static lg:translate-x-0) */}
+            <div className="absolute left-1/2 -translate-x-1/2 lg:static lg:translate-x-0">
+              <a href="/" className="text-2xl font-light tracking-widest text-gray-900 whitespace-nowrap">
+                {t.navbar.storeName}
+              </a>
+            </div>
+          </div>
+
+          {/* Icons */}
+          <div className="flex items-center gap-4 sm:gap-6 relative z-10">
+            
+            {/* Language Dropdown Menu */}
+            <div className="relative" ref={langDropdownRef}>
+              <button
+                onClick={() => setIsLangDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-1.5 text-sm font-light tracking-wider text-gray-700 hover:text-gray-900 transition-colors border border-gray-300 hover:border-gray-900 px-3 py-1.5 rounded"
+                aria-label="Select language"
+              >
+                <FiGlobe className="w-4 h-4" />
+                <span>{lang === 'ar' ? 'العربية' : 'English'}</span>
+              </button>
+
+              {isLangDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-36 bg-white border border-gray-200 shadow-lg z-50 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => {
+                      if (lang === 'ar') toggleLang();
+                      setIsLangDropdownOpen(false);
+                    }}
+                    className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                      lang === 'en' ? 'bg-gray-100 font-medium text-gray-900' : 'font-light text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (lang === 'en') toggleLang();
+                      setIsLangDropdownOpen(false);
+                    }}
+                    className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                      lang === 'ar' ? 'bg-gray-100 font-medium text-gray-900' : 'font-light text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    العربية
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Search */}
+            <div className="relative" ref={searchRef}>
+              <button 
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                className="text-gray-700 hover:text-gray-900 transition-colors" 
+                aria-label="Search"
+              >
+                <FiSearch className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+
+              {isSearchOpen && (
+                <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} top-full mt-2 w-64 sm:w-80 bg-white border border-gray-200 shadow-lg z-50 rounded-lg p-3`}>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={t.navbar.searchPlaceholder}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSearch();
+                        }
+                      }}
+                      className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSearch}
+                      className="px-4 py-2 bg-gray-900 text-white text-sm rounded hover:bg-gray-800"
+                    >
+                      {t.navbar.search}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* User Button */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={handleUserClick}
+                className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
+                aria-label="User Account"
+              >
+                <FiUser className="w-5 h-5 sm:w-6 sm:h-6" />
+                <span className="hidden sm:block text-sm font-light text-gray-900">
+                  {user && (user.name || user.email) ? (user.name || user.email.split('@')[0]) : t.navbar.guest}
+                </span>
+              </button>
+
+              {/* Dropdown */}
+              {user && (user.name || user.email) && isUserDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 shadow-lg z-50 rounded-lg overflow-hidden">
+                  <div className="p-4 border-b border-gray-100">
+                    <p className="text-sm font-light text-gray-900">{user.name || user.email?.split('@')[0] || 'User'}</p>
+                    <p className="text-xs font-light text-gray-600 mt-1">{user.email || ''}</p>
+                  </div>
+                  <div className="border-t border-gray-100">
+                    <button
+                      className="w-full px-4 py-3 text-left text-sm font-light text-red-600 hover:bg-red-50 transition-colors flex items-center gap-3"
+                      onClick={handleLogout}
+                    >
+                      {t.navbar.logout}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Horizontal Line */}
+        <div className="h-px bg-gray-200 w-full"></div>
+
+        {/* Navigation Links */}
+        <div className={`pt-4 pb-4 ${isMenuOpen ? "block" : "hidden"} lg:block`}>
+          <div className="flex flex-col lg:flex-row flex-wrap justify-center items-center gap-3 sm:gap-4 md:gap-6 lg:gap-8">
+            {loading ? (
+              <div className="text-gray-500">{t.navbar.loading}</div>
+            ) : (
+              categories.map((category) => {
+                const key = category.name.toLowerCase();
+                const translatedName = t.navbar.categoryNames[key]
+                  || category.name.charAt(0).toUpperCase() + category.name.slice(1);
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => handleNavClick(category.name)}
+                    className={`text-base font-light tracking-wider uppercase transition-colors ${
+                      activeCollection === category.name.toLowerCase()
+                        ? "text-gray-900 border-b border-gray-900 pb-1"
+                        : "text-gray-900 hover:text-gray-600"
+                    }`}
+                  >
+                    {translatedName}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+export default Navbar;
